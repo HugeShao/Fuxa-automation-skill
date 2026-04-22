@@ -1,0 +1,146 @@
+{
+  "_comment": "FUXA 配置模板",
+
+  "settings-default": {
+    "_comment": "默认配置 (settings.default.js) - 不要直接修改，修改 mysettings.json 覆盖",
+    "version": 1.4,
+    "language": "en",
+    "hideEditorOnboarding": false,
+    "uiPort": 1881,
+    "logDir": "_logs",
+    "logApiLevel": "tiny",
+    "dbDir": "_db",
+    "daqEnabled": true,
+    "daqTokenizer": 24,
+    "logs": {
+      "retention": "none"
+    },
+    "broadcastAll": false,
+    "allowedOrigins": [
+      "http://localhost",
+      "http://127.0.0.1",
+      "http://192.168.*",
+      "http://10.*",
+      "http://localhost:4200"
+    ],
+    "heartbeatIntervalSec": 10,
+    "webcamSnapShotsDir": "_webcam_snapshots",
+    "webcamSnapShotsCleanup": false,
+    "webcamSnapShotsRetain": 7,
+    "swaggerEnabled": false,
+    "nodeRedEnabled": false,
+    "nodeRedAuthMode": "secure",
+    "nodeRedUnsafeModules": false
+  },
+
+  "mysettings-override": {
+    "_comment": "用户自定义配置 (mysettings.json) - 覆盖默认配置中的对应字段",
+    "_note": "只有需要修改的配置项才需要出现在此文件中",
+
+    "language": "zh-cn",
+    "hideEditorOnboarding": false,
+    "uiPort": 1881,
+
+    "secureEnabled": true,
+    "_secureNote": "启用安全认证（JWT）",
+
+    "secureOnlyEditor": false,
+    "_secureOnlyEditorNote": "true = 仅编辑器需要认证，false = 全部需要认证",
+
+    "tokenExpiresIn": "1h",
+    "_tokenExpiresInNote": "JWT Token 过期时间，格式如 1h, 30m, 7d",
+
+    "enableRefreshCookieAuth": false,
+    "_enableRefreshCookieAuthNote": "启用基于 Cookie 的刷新 Token",
+
+    "refreshTokenExpiresIn": "7d",
+    "_refreshTokenExpiresInNote": "刷新 Token 过期时间",
+
+    "secretCode": "<YOUR_JWT_SECRET>",
+    "_secretCodeNote": "JWT 签名密钥，secureEnabled=true 时必须设置",
+
+    "smtp": {
+      "host": "smtp.example.com",
+      "port": 587,
+      "secure": false,
+      "username": "noreply@example.com",
+      "password": "password",
+      "from": "FUXA Alarm <noreply@example.com>"
+    },
+
+    "daqstore": {
+      "_comment": "DAQ 历史数据存储配置",
+      "_supportedTypes": ["SQLite", "InfluxDB", "InfluxDB18", "TDengine", "QuestDB"],
+      "type": "SQLite",
+      "retention": "none",
+
+      "_questdb-example": {
+        "type": "QuestDB",
+        "host": "127.0.0.1",
+        "tableName": "meters",
+        "credentials": {
+          "username": "admin",
+          "password": "quest"
+        }
+      },
+
+      "_influxdb-example": {
+        "type": "InfluxDB",
+        "host": "http://127.0.0.1:8086",
+        "bucket": "fuxa",
+        "org": "fuxa",
+        "token": "your-token"
+      },
+
+      "_tdengine-example": {
+        "type": "TDengine",
+        "host": "127.0.0.1",
+        "port": 6041,
+        "database": "fuxa",
+        "username": "root",
+        "password": "taosdata"
+      }
+    },
+
+    "alarms": {
+      "retention": "none"
+    },
+
+    "logs": {
+      "retention": "none"
+    },
+
+    "broadcastAll": false,
+    "logFull": false,
+    "_logFullNote": "true = 记录完整日志（含设备通信详情），false = 仅记录基本日志",
+
+    "userRole": "roles",
+    "_userRoleNote": "'bitmask' = 传统位掩码权限模式, 'roles' = 基于角色的权限模式",
+
+    "nodeRedEnabled": false,
+    "nodeRedAuthMode": "secure",
+    "swaggerEnabled": false
+  },
+
+  "settings-loading-flow": {
+    "_comment": "配置加载流程 (server/main.js)",
+    "step1": "加载 server/settings.default.js 作为基础配置",
+    "step2": "如果 _appdata/settings.js 不存在，从默认配置复制",
+    "step3": "加载 _appdata/settings.js 作为主配置",
+    "step4": "版本不匹配时，与默认配置合并合并",
+    "step5": "如果存在 _appdata/mysettings.json，覆盖特定配置项",
+    "step6": "如果 secureEnabled=true 且无 secretCode，自动生成密钥"
+  },
+
+  "key-file-locations": {
+    "_comment": "关键文件路径",
+    "defaultSettings": "server/settings.default.js",
+    "runtimeSettings": "_appdata/settings.js",
+    "userOverride": "_appdata/mysettings.json",
+    "projectDb": "_appdata/project.fuxap.db",
+    "alarmsDb": "_appdata/alarms.fuxap.db",
+    "usersDb": "_appdata/users.fuxap.db",
+    "schedulerDb": "_appdata/scheduler.db",
+    "apikeysDb": "_appdata/apikeys.fuxap.db"
+  }
+}

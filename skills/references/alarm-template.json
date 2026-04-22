@@ -1,0 +1,182 @@
+{
+  "_comment": "FUXA 报警配置模板",
+  "_alarmTypes": ["highhigh", "high", "low", "info"],
+  "_alarmAckModes": ["float", "ackactive", "ackpassive"],
+  "_alarmStatusEnum": { "VOID": "", "ON": "N", "OFF": "NF", "ACK": "NA" },
+  "_actionsTypes": ["popup", "setValue", "setView", "sendMsg", "toastMessage", "runScript"],
+
+  "alarms": [
+    {
+      "name": "模板-模拟量报警",
+      "property": {
+        "variableId": "tag-id"
+      },
+      "highhigh": {
+        "enabled": true,
+        "min": 100,
+        "max": 150,
+        "checkdelay": 1,
+        "timedelay": 0,
+        "ackmode": "ackactive",
+        "text": "高高报警触发！",
+        "group": "温度报警",
+        "bkcolor": "#ff0000",
+        "color": "#ffffff"
+      },
+      "high": {
+        "enabled": true,
+        "min": 80,
+        "max": 100,
+        "checkdelay": 1,
+        "timedelay": 5,
+        "ackmode": "float",
+        "text": "高报警触发",
+        "group": "温度报警",
+        "bkcolor": "#ff8800",
+        "color": "#000000"
+      },
+      "low": {
+        "enabled": true,
+        "min": 10,
+        "max": 20,
+        "checkdelay": 1,
+        "timedelay": 5,
+        "ackmode": "float",
+        "text": "低报警触发",
+        "group": "温度报警",
+        "bkcolor": "#0088ff",
+        "color": "#ffffff"
+      },
+      "info": {
+        "enabled": false,
+        "min": 0,
+        "max": 0,
+        "checkdelay": 1,
+        "timedelay": 0,
+        "ackmode": "float",
+        "text": "",
+        "group": "",
+        "bkcolor": "#00cc00",
+        "color": "#000000"
+      },
+      "actions": {
+        "enabled": false,
+        "values": [
+          {
+            "min": 0,
+            "max": 1,
+            "checkdelay": 1,
+            "type": "setValue",
+            "actparam": "target-tag-id",
+            "actoptions": {}
+          }
+        ]
+      },
+      "permission": null,
+      "permissionRoles": {
+        "show": ["admin", "operator"],
+        "enabled": ["admin"]
+      }
+    },
+    {
+      "name": "模板-开关量报警",
+      "property": {
+        "variableId": "digital-tag-id",
+        "bitmask": 1
+      },
+      "high": {
+        "enabled": true,
+        "min": 0.5,
+        "max": 1.5,
+        "checkdelay": 1,
+        "timedelay": 0,
+        "ackmode": "ackactive",
+        "text": "设备故障",
+        "group": "设备状态",
+        "bkcolor": "#ff0000",
+        "color": "#ffffff"
+      },
+      "low": {
+        "enabled": false
+      },
+      "highhigh": {
+        "enabled": false
+      },
+      "info": {
+        "enabled": false
+      },
+      "actions": {
+        "enabled": true,
+        "values": [
+          {
+            "min": 0.5,
+            "max": 1.5,
+            "checkdelay": 1,
+            "type": "popup",
+            "actparam": "alarm-popup-view",
+            "actoptions": {}
+          }
+        ]
+      },
+      "permission": null,
+      "permissionRoles": {
+        "show": ["admin"],
+        "enabled": ["admin"]
+      }
+    }
+  ],
+
+  "notifications": [
+    {
+      "id": "notification-template-email",
+      "name": "邮件通知模板",
+      "type": "high",
+      "receiver": "operator@example.com",
+      "delay": 1,
+      "interval": 0,
+      "enabled": true,
+      "text": "报警通知：${alarmName} 已触发",
+      "subscriptions": {
+        "highhigh": true,
+        "high": true,
+        "low": false,
+        "info": false
+      },
+      "options": {},
+      "mode": 0
+    },
+    {
+      "id": "notification-template-webhook",
+      "name": "Webhook 通知模板",
+      "type": "high",
+      "receiver": "http://your-server/api/alarm?content=${content}",
+      "delay": 0,
+      "interval": 5,
+      "enabled": true,
+      "text": "",
+      "subscriptions": {
+        "highhigh": true,
+        "high": true,
+        "low": true,
+        "info": false
+      },
+      "options": {},
+      "mode": 1
+    }
+  ],
+
+  "_notificationModes": {
+    "all": 0,
+    "single": 1
+  },
+
+  "_smtpConfig": {
+    "_location": "mysettings.json -> smtp",
+    "host": "smtp.example.com",
+    "port": 587,
+    "secure": false,
+    "username": "noreply@example.com",
+    "password": "password",
+    "from": "FUXA Alarm <noreply@example.com>"
+  }
+}

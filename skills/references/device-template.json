@@ -1,0 +1,422 @@
+{
+  "_comment": "FUXA 设备驱动配置模板集合",
+  "_version": "2.0.0",
+  "_fieldReference": "参见 data-models.md 获取完整字段定义和枚举值",
+
+  "_deviceTypes": [
+    "FuxaServer", "SiemensS7", "OPCUA", "BACnet", "ModbusRTU", "ModbusTCP",
+    "WebAPI", "MQTTclient", "internal", "EthernetIP", "ODBC", "ADSclient",
+    "GPIO", "WebCam", "MELSEC", "REDIS"
+  ],
+
+  "_prefixes": {
+    "device": "d_",
+    "tag": "t_"
+  },
+
+  "_modbusAddressRules": {
+    "_comment": "⚠️ 关键：memaddress 是 6 位基址（固定值），不是寄存器编号范围。前端 tag-property-edit-modbus.component.ts 下拉框精确匹配此值",
+    "_frontendMapping": "前端下拉框选项值: '000000' Coil | '100000' DI | '300000' IR | '400000' HR",
+    "coil": { "memaddress": "000000", "addressRange": "1-65536", "example": "Coil 000001 = memaddress:'000000', address:'1'" },
+    "discreteInput": { "memaddress": "100000", "addressRange": "1-65536", "example": "DI 10001 = memaddress:'100000', address:'1'" },
+    "inputRegister": { "memaddress": "300000", "addressRange": "1-65536", "example": "IR 30001 = memaddress:'300000', address:'1'" },
+    "holdingRegister": { "memaddress": "400000", "addressRange": "1-65536", "example": "HR 40001 = memaddress:'400000', address:'1'" }
+  },
+
+  "_tagTypesByDevice": {
+    "ModbusTCP/ModbusRTU": ["Bool", "Int16", "UInt16", "Int32", "UInt32", "Float32", "Float64", "Int64", "Int16LE", "UInt16LE", "Int32LE", "UInt32LE", "Float32LE", "Float64LE", "Int64LE", "Float32MLE", "Int32MLE", "UInt32MLE", "Float64MLE"],
+    "OPCUA": ["Boolean", "SByte", "Byte", "Int16", "UInt16", "Int32", "UInt32", "Int64", "UInt64", "Float", "Double", "String", "DateTime", "Guid", "ByteString"],
+    "SiemensS7": ["Bool", "Byte", "Int", "Word", "DInt", "DWord", "Real"],
+    "MELSEC": ["BOOL", "BYTE", "WORD", "INT", "UINT", "DINT", "UDINT", "REAL", "STRING"],
+    "ADSclient": ["number", "boolean", "string"],
+    "REDIS/ServerTag": ["number", "boolean", "string"]
+  },
+
+  "templates": {
+
+    "modbus-tcp": {
+      "_comment": "Modbus TCP 设备模板 - 字段名必须精确匹配 device.ts 定义",
+      "name": "Modbus TCP 设备",
+      "type": "ModbusTCP",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "_comment": "DeviceNetProperty 字段 - 注意 slaveid 是全小写字符串",
+        "address": "192.168.1.100",
+        "port": "502",
+        "slaveid": "1",
+        "delay": 10,
+        "socketReuse": null,
+        "forceFC16": false
+      },
+      "tags": {
+        "_exampleTag": {
+          "_comment": "⚠️ memaddress 必须是 6 位基址（非范围值），与前端下拉框精确匹配",
+          "_memaddressMap": {
+            "000000": "Coil Status (Read/Write 000001-065536)",
+            "100000": "Digital Inputs (Read 100001-165536)",
+            "300000": "Input Registers (Read 300001-365536)",
+            "400000": "Holding Registers (Read/Write 400001-465535)"
+          },
+          "_addressRule": "address 是 1-based 偏移量。若文档给十六进制偏移 0x0030，则 address = 0x30 + 1 = 49",
+          "id": "t_example",
+          "name": "温度传感器",
+          "type": "Int16LE",
+          "memaddress": "300000",
+          "address": "1",
+          "divisor": 1,
+          "format": 2,
+          "_scaleExample": "FUXA 支持 scale 表达式模式，用 readExpression 转换原始值，this 代表原始寄存器值",
+          "scale": {
+            "mode": "expression",
+            "readExpression": "(this/100-32)/1.8"
+          },
+          "daq": {
+            "enabled": false,
+            "changed": true,
+            "interval": 60,
+            "restored": false
+          }
+        }
+      }
+    },
+
+    "modbus-rtu": {
+      "_comment": "Modbus RTU 串口设备模板",
+      "name": "Modbus RTU 设备",
+      "type": "ModbusRTU",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "",
+        "baudrate": "9600",
+        "databits": "8",
+        "stopbits": "1",
+        "parity": "none",
+        "slaveid": "1",
+        "delay": 10,
+        "connectionOption": "SerialPort"
+      },
+      "tags": {}
+    },
+
+    "opcua": {
+      "_comment": "OPC UA 服务器模板 - address 是节点 ID",
+      "name": "OPC UA 服务器",
+      "type": "OPCUA",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "4840"
+      },
+      "security": {
+        "_comment": "DeviceSecurity 配置",
+        "mode": null,
+        "username": "",
+        "password": "",
+        "certificateFileName": null,
+        "privateKeyFileName": null,
+        "caCertificateFileName": null
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_opcua_example",
+          "name": "电机状态",
+          "type": "Boolean",
+          "memaddress": "",
+          "address": "ns=2;s=Motor.Status",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "s7": {
+      "_comment": "Siemens S7 PLC 模板 - property.rack/slot 必须设置",
+      "name": "Siemens S7 PLC",
+      "type": "SiemensS7",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "102",
+        "rack": "0",
+        "slot": "1"
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_s7_example",
+          "name": "DB1.温度",
+          "type": "Real",
+          "memaddress": "DB1",
+          "address": "DBD0",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "bacnet": {
+      "_comment": "BACnet 楼宇自动化设备模板",
+      "name": "BACnet 设备",
+      "type": "BACnet",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "47808"
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_bacnet_example",
+          "name": "温度",
+          "label": "Analog Input,123",
+          "type": "Float",
+          "address": "Analog Input,123",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "mqtt": {
+      "_comment": "MQTT 客户端模板 - options 包含 pub/sub 配置",
+      "name": "MQTT Broker",
+      "type": "MQTTclient",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "1883"
+      },
+      "security": {
+        "username": "",
+        "password": "",
+        "clientId": "fuxa-mqtt-client"
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_mqtt_example",
+          "name": "温度",
+          "type": "Float",
+          "memaddress": "factory/sensor/temperature",
+          "options": {
+            "subs": { "topic": "factory/sensor/temperature", "qos": 1 },
+            "pubs": { "topic": "factory/sensor/set", "qos": 1 }
+          },
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "webapi": {
+      "_comment": "Web API HTTP 接口模板 - options 配置请求参数",
+      "name": "Web API 设备",
+      "type": "WebAPI",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "method": "GET",
+        "format": "JSON"
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_webapi_example",
+          "name": "API数据",
+          "label": "data.temperature",
+          "type": "Float",
+          "memaddress": "/api/data",
+          "options": { "path": "data.temperature" },
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "ethernetip": {
+      "_comment": "EtherNet/IP 罗克韦尔 PLC 模板",
+      "name": "EtherNet/IP PLC",
+      "type": "EthernetIP",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "44818",
+        "options": "0,0"
+      },
+      "tags": {}
+    },
+
+    "fuxaserver": {
+      "_comment": "FUXA Server 互联模板 - 用于连接其他 FUXA 服务器",
+      "name": "FUXA Server",
+      "type": "FuxaServer",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "1881"
+      },
+      "security": {
+        "username": "",
+        "password": ""
+      },
+      "tags": {}
+    },
+
+    "odbc": {
+      "_comment": "ODBC 数据库模板",
+      "name": "ODBC 数据库",
+      "type": "ODBC",
+      "enabled": true,
+      "polling": 1000,
+      "property": {},
+      "tags": {}
+    },
+
+    "ads": {
+      "_comment": "Beckhoff ADS 模板 - 需要 AMS Net ID 和端口",
+      "name": "Beckhoff ADS",
+      "type": "ADSclient",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "48898"
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_ads_example",
+          "name": "变量1",
+          "type": "number",
+          "memaddress": "MAIN.Var1",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "melsec": {
+      "_comment": "Mitsubishi MELSEC PLC 模板",
+      "name": "Mitsubishi MELSEC",
+      "type": "MELSEC",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "5007",
+        "ascii": false,
+        "octalIO": false
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_melsec_example",
+          "name": "D100",
+          "type": "WORD",
+          "address": "D100",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "redis": {
+      "_comment": "Redis 模板 - connectionOption 设置 readMode",
+      "name": "Redis",
+      "type": "REDIS",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "6379",
+        "connectionOption": "simple"
+      },
+      "tags": {
+        "_exampleTag": {
+          "id": "t_redis_example",
+          "name": "key1",
+          "type": "number",
+          "address": "key1",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "gpio": {
+      "_comment": "Raspberry Pi GPIO 模板 - direction/edge 配置引脚",
+      "name": "Raspberry Pi GPIO",
+      "type": "GPIO",
+      "enabled": true,
+      "polling": 1000,
+      "property": {},
+      "tags": {
+        "_exampleTagInput": {
+          "id": "t_gpio_in",
+          "name": "GPIO17",
+          "type": "Bool",
+          "address": "17",
+          "direction": "in",
+          "edge": "rising",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        },
+        "_exampleTagOutput": {
+          "id": "t_gpio_out",
+          "name": "GPIO18",
+          "type": "Bool",
+          "address": "18",
+          "direction": "out",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    },
+
+    "webcam": {
+      "_comment": "WebCam 摄像头模板",
+      "name": "WebCam",
+      "type": "WebCam",
+      "enabled": true,
+      "polling": 1000,
+      "property": {
+        "address": "192.168.1.100",
+        "port": "8080"
+      },
+      "tags": {}
+    },
+
+    "internal": {
+      "_comment": "内部虚拟设备模板 - 用于创建虚拟标签，无需硬件",
+      "name": "内部虚拟设备",
+      "type": "internal",
+      "enabled": true,
+      "polling": 1000,
+      "property": {},
+      "tags": {
+        "_exampleTag": {
+          "id": "t_internal_example",
+          "name": "虚拟温度",
+          "type": "number",
+          "init": "25",
+          "daq": { "enabled": false, "changed": true, "interval": 60, "restored": false }
+        }
+      }
+    }
+  },
+
+  "_apiEndpoint": {
+    "_comment": "创建设备使用 POST /api/projectData",
+    "endpoint": "/api/projectData",
+    "method": "POST",
+    "body": {
+      "cmd": "set-device",
+      "data": { "...device object..." }
+    }
+  },
+
+  "_commonErrors": {
+    "wrongSlaveIdField": { "wrong": "property.unitId", "correct": "property.slaveid" },
+    "wrongLanguageCode": { "wrong": "language: 'zh'", "correct": "language: 'zh-cn'" },
+    "wrongCmdValue": { "wrong": "cmd: 'devices'", "correct": "cmd: 'set-device'" },
+    "wrongMemaddress5digit": { "wrong": "memaddress: '300001' (5位范围值)", "correct": "memaddress: '300000' (6位基址，前端下拉框精确匹配)", "rootCause": "前端 tag-property-edit-modbus.component.ts 下拉框选项值是固定基址: 000000/100000/300000/400000" },
+    "wrongPortType": { "wrong": "property.port: 502 (number)", "correct": "property.port: '502' (string)" },
+    "wrongAddressField": { "wrong": "property.host", "correct": "property.address" },
+    "wrongTagType": { "wrong": "所有标签一刀切 Float32", "correct": "严格按设备文档数据类型设置，如 '整型有符号顺序AB' → 'Int16LE'" },
+    "missingScaleExpression": { "wrong": "忽略文档中的转换公式", "correct": "使用 scale: {mode: 'expression', readExpression: 'this*0.01'} 转换原始值，this 代表原始寄存器值" },
+    "wrongAddressOffset": { "wrong": "用文档显示编号(30031)减基址得偏移", "correct": "用文档给定的十六进制偏移量转十进制+1作为address(1-based)。如hex 0x0030 → address: 49" }
+  }
+}
