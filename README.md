@@ -77,48 +77,189 @@ git clone https://github.com/HugeShao/Fuxa-automation-skill <TARGET>
 
 ### 🚀 本地部署 FUXA
 
-![](E:\claude_code\fuxa-automation\images\install.jpg)
+```
+用户                      ❯ 帮我用 NPM 在本地部署一个 FUXA
+
+fuxa-automation.skill    ❯ 好的，正在通过 NPM 全局安装 FUXA：
+
+                          ① 全局安装
+                          $ npm install -g --unsafe-perm @frangoteam/fuxa
+
+                          ② 后台启动
+                          $ nohup fuxa > fuxa.log 2>&1 &
+                          PID: 12345
+
+                          ✅ FUXA 已启动！访问 http://localhost:1881
+```
 
 ### 🔧 配置 Modbus TCP 设备
 
+```
+用户                      ❯ 帮我连一个 Modbus TCP 设备，IP 192.168.1.100，端口 502，从站号 1
+                            需要读 3 个标签：温度（HR 40001，Int16LE）、湿度（HR 40002，Int16LE）、
+                            压力（HR 40003，Float32LE）
 
+fuxa-automation.skill    ❯ 已创建 Modbus TCP 设备，配置如下：
 
-![](E:\claude_code\fuxa-automation\images\peizhi.jpg)
+                          📡 设备：Modbus TCP 设备（d_modbus_01）
+                             地址：192.168.1.100:502
+                             从站：1
+                             轮询：1000ms
+
+                          📋 标签列表：
+                          ┌──────────┬──────────┬─────────────┬───────────┐
+                          │ 标签 ID  │ 名称     │ 类型        │ 地址      │
+                          ├──────────┼──────────┼─────────────┼───────────┤
+                          │ t_temp   │ 温度     │ Int16LE     │ HR 40001  │
+                          │ t_humid  │ 湿度     │ Int16LE     │ HR 40002  │
+                          │ t_press  │ 压力     │ Float32LE   │ HR 40003  │
+                          └──────────┴──────────┴─────────────┴───────────┘
+
+                          ✅ 设备已通过 API 推送到 FUXA 服务器，连接状态：在线
+```
 
 ### 🚨 配置温度报警
 
 ```
-用户                      ❯ 给温度标签配一个高报警，阈值 80 度
+用户                      ❯ 给温度标签配一个高报警阈值 80 度，高高报警阈值 100 度，低于 10 度报低报警
 
-fuxa-automation.skill    ❯ 已为标签 t_tag1 配置高报警：
-                          阈值：≥ 80°C
-                          确认模式：主动确认
-                          报警文本：温度超过80°C
-                          动作：弹出提示
+fuxa-automation.skill    ❯ 已为标签 t_temp 配置三级报警：
+
+                          🚨 报警名称：温度报警
+                             关联标签：t_temp（温度）
+
+                          ┌──────────┬────────┬────────┬──────────┬───────────────┐
+                          │ 级别     │ 阈值   │ 延时   │ 确认模式 │ 文本          │
+                          ├──────────┼────────┼────────┼──────────┼───────────────┤
+                          │ 🔴 高高  │ ≥ 100  │ 0s     │ 主动确认 │ 温度超高报警！ │
+                          │ 🟠 高    │ ≥ 80   │ 5s     │ 自动恢复 │ 温度超过80°C  │
+                          │ 🔵 低    │ ≤ 10   │ 5s     │ 自动恢复 │ 温度过低      │
+                          └──────────┴────────┴────────┴──────────┴───────────────┘
+
+                          ✅ 报警已生效，触发时 FUXA 界面会自动弹出提示
 ```
 
+### 📧 配置报警通知
 
+```
+用户                      ❯ 温度高高报警时给我发邮件通知，发给 operator@example.com
 
-### 📊 读取历史数据
+fuxa-automation.skill    ❯ 已配置邮件通知：
+
+                          📬 通知名称：温度报警邮件
+                             接收人：operator@example.com
+                             订阅级别：高高报警 ✓  高报警 ✗  低报警 ✗
+                             邮件模板：报警通知：${alarmName} 已触发
+
+                          ⚙️ 需要 FUXA 服务器已配置 SMTP，当前 SMTP 配置：
+                             服务器：smtp.example.com:587
+                             发件人：noreply@example.com
+```
+
+### 📊 读取实时标签值
+
+```
+用户                      ❯ 读一下现在的温度和湿度
+
+fuxa-automation.skill    ❯ 标签实时值：
+
+                          ┌──────────┬────────┬─────────────┐
+                          │ 标签     │ 值     │ 时间        │
+                          ├──────────┼────────┼─────────────┤
+                          │ t_temp   │ 72.5°C │ 14:32:08    │
+                          │ t_humid  │ 45.2%  │ 14:32:08    │
+                          └──────────┴────────┴─────────────┘
+```
+
+### ✏️ 写入标签值
+
+```
+用户                      ❯ 把启动开关 t_start 设为 true
+
+fuxa-automation.skill    ❯ 写入成功：
+
+                          t_start: false → true  ✅
+```
+
+### 📈 查询历史数据
 
 ```
 用户                      ❯ 查一下过去 24 小时的温度数据
 
 fuxa-automation.skill    ❯ 查询到 1440 条记录：
-                          最高：95.2°C（14:32）
-                          最低：42.1°C（03:15）
-                          平均：68.5°C
+
+                          📈 温度（t_temp）24h 统计
+                          ┌──────────┬─────────┐
+                          │ 最高     │ 95.2°C  │
+                          │ 最低     │ 42.1°C  │
+                          │ 平均     │ 68.5°C  │
+                          │ 峰值时间 │ 14:32   │
+                          │ 谷值时间 │ 03:15   │
+                          └──────────┴─────────┘
+
+                          数据来自 DAQ 存储，采集间隔 60s
 ```
 
+### 📜 生成服务端脚本
 
+```
+用户                      ❯ 写个脚本：每小时检查一次温度，超过 80 度就自动把空调 t_ac 设为 true
 
+fuxa-automation.skill    ❯ 已生成并部署脚本：
 
+                          📜 脚本名称：温度自动控空调
+                             触发方式：调度（每小时执行）
+
+                          (function() {
+                            var temp = fuxa.getTagValue('t_temp');
+                            if (temp > 80) {
+                              fuxa.setTagValue('t_ac', true);
+                              fuxa.log('温度 ' + temp + '°C 超限，已开启空调', 'warn');
+                            } else if (temp < 75) {
+                              fuxa.setTagValue('t_ac', false);
+                              fuxa.log('温度 ' + temp + '°C 已恢复正常，关闭空调', 'info');
+                            }
+                            return { success: true };
+                          })();
+
+                          ✅ 脚本已创建并绑定调度器，下次整点自动执行
+```
+
+### 👥 用户与权限管理
+
+```
+用户                      ❯ 创建一个操作员账号，用户名 operator，只给查看和操作权限，不给编辑权限
+
+fuxa-automation.skill    ❯ 已创建用户：
+
+                          👤 用户：operator
+                             全名：操作员
+                             角色：operator
+                             权限范围：
+                               ✅ 查看视图/数据
+                               ✅ 操作控件/写标签
+                               ✅ 确认报警
+                               ❌ 编辑组态
+                               ❌ 系统管理
+```
+
+### ⚙️ 系统设置
+
+```
+用户                      ❯ 把 FUXA 语言改成中文，开启 Swagger API 文档
+
+fuxa-automation.skill    ❯ 已更新系统设置：
+
+                          ⚙️ 变更项：
+                             language:  "en"    → "zh-cn"
+                             swaggerEnabled: false → true
+
+                          ✅ 设置已通过 API 实时生效，无需重启
+```
 
 ------
 
 ## 🔧 功能特性
-
-### 🧱 Skill 结构
 
 
 fuxa-automation 以 **FUXAClient** 为核心，按功能模块组织：
