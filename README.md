@@ -14,7 +14,7 @@
 
 
 
-> 一个 AI Agent 技能，让 Claude Code / OpenClaw / Hermes 具备工业 SCADA 系统的远程配置和操作能力。只需对话，AI 自动完成设备驱动配置、报警设置、数据查询、组态设计等操作。所有操作通过 FUXA REST API 完成，无需在本机安装 FUXA。
+> 一个 AI Agent 技能，让 Claude Code / OpenClaw / Hermes 具备工业 SCADA 系统的远程配置和操作能力。只需对话，AI 自动完成设备驱动配置、报警设置、数据查询、组态设计等操作。设备/报警/脚本等配置通过 FUXA REST API 完成；前端入口注入等 API 无端点的需求按受控离线流程处理，均无需在本机安装 FUXA 服务端。
 
 
 
@@ -210,14 +210,13 @@ fuxa-automation.skill    ❯ 已生成并部署脚本：
                           📜 脚本名称：温度自动控空调
                              触发方式：调度（每小时执行）
 
-                          (function() {
-                            var temp = fuxa.getTagValue('t_temp');
+                          (async function() {
+                            // FUXA 1.3.3：用 $getTag/$setTag，必须 await，且必须传 tagId
+                            var temp = await $getTag('t_temp');
                             if (temp > 80) {
-                              fuxa.setTagValue('t_ac', true);
-                              fuxa.log('温度 ' + temp + '°C 超限，已开启空调', 'warn');
+                              await $setTag('t_ac', true);
                             } else if (temp < 75) {
-                              fuxa.setTagValue('t_ac', false);
-                              fuxa.log('温度 ' + temp + '°C 已恢复正常，关闭空调', 'info');
+                              await $setTag('t_ac', false);
                             }
                             return { success: true };
                           })();
@@ -237,8 +236,8 @@ fuxa-automation.skill    ❯ 已创建用户：
                              角色：operator
                              权限范围：
                                ✅ 查看视图/数据
-                               ✅ 操作控件/写标签
-                               ✅ 确认报警
+                               ✅ 操作控件/写标签（1.3.3 原生 admin-only，需补丁 command/index.js）
+                               ❌ 确认报警（1.3.3 的 alarmack 仍 admin-only）
                                ❌ 编辑组态
                                ❌ 系统管理
 ```
@@ -291,6 +290,7 @@ fuxa-automation/
 │   └── references/                     # 参考文档与模板
 │       ├── fuxa-cli.js                 #   FUXA REST API 客户端 + 部署工具
 │       ├── data-models.md              #   完整数据模型文档（Device/Tag/Alarm/View/Settings...）
+│       ├── fuxa-133-field-notes.md     #   1.3.3 现场实战笔记（事件/脚本/认证/离线SOP/容量红线）
 │       ├── device-template.json        #   16 种设备驱动配置模板
 │       ├── alarm-template.json         #   报警和通知配置模板
 │       ├── config-template.json        #   系统设置配置模板
@@ -307,5 +307,6 @@ fuxa-automation/
 
 ## ⚠️ 注意事项
 
-- **版本兼容**：基于 FUXA 1.3.1 版本编写的skill，别的版本可能存在兼容性问题
+- **版本兼容**：REST API 手册基于 FUXA 1.3.1；**2026-11-12 已回灌 1.3.3 现场实证修正**（脚本 API、登录返回结构、tag 权限、视图事件机制、离线改库 SOP），详见 `skills/references/fuxa-133-field-notes.md`。其它版本仍可能不兼容。
+- 1.3.3 上大量 UI/前端需求（登录遮罩、手机跳转、PWA、容器补丁）**REST API 无端点**，需按 `SKILL.md`「红线规则·二级」的离线受控直改流程处理，不要热改正在运行的工程库。
 - 目前还是 demo 版本，如果有 bug 请多多提 issue！
