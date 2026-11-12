@@ -1,15 +1,22 @@
 ---
 name: "FUXA-Automation"
-description: "FUXA SCADA/HMI 自动化配置技能。通过 REST API 远程管理 FUXA 服务器，支持设备驱动配置（16种协议）、报警配置、组态配置、脚本生成、DAQ存储配置等。触发词：FUXA部署、FUXA配置、组态配置、设备驱动配置、报警配置、SCADA配置、HMI配置、生成FUXA脚本、FUXA脚本、工业自动化配置、PLC连接配置、Modbus配置、OPC-UA配置、MQTT配置、S7配置、BACnet配置"
+description: "FUXA SCADA/HMI 自动化配置技能。通过 REST API 远程管理 FUXA 服务器，支持设备驱动配置（16种协议）、报警配置、组态配置、脚本生成、DAQ存储配置等；含 FUXA 1.3.3 现场实证修正（客户端脚本、视图事件、认证权限、移动端、离线受控改工程库、容器补丁持久化、容量红线）。触发词：FUXA部署、FUXA配置、组态配置、设备驱动配置、报警配置、SCADA配置、HMI配置、生成FUXA脚本、FUXA脚本、FUXA 1.3.3、FUXA画面、FUXA视图、FUXA事件、FUXA导航、FUXA登录、FUXA权限、FUXA手机端、FUXA工程库、FUXA容器补丁、FUXA备份恢复、FUXA摄像头、工业自动化配置、PLC连接配置、Modbus配置、OPC-UA配置、MQTT配置、S7配置、BACnet配置"
 version: "0.0.1"
 author: "huge"
 ---
 
 # FUXA 自动化配置技能
 
+## 版本与适用范围
+
+- 主文档的 REST API 操作手册基于 FUXA **1.3.1** 编写，**CRUD 流程在 1.3.3 仍可用**；但脚本 API、登录返回结构、部分端点格式已变化，本版已回灌修正。
+- 实测环境：Docker `fuxa:snap7-1.3.3` + Armbian 盒子 + 卷 `fuxa_appdata`。
+- **凡涉及 1.3.3 的视图/事件机制、客户端脚本、认证权限、移动端、容器补丁、容量规划，必须先读 `references/fuxa-133-field-notes.md`。** 该笔记是现场实证，与其冲突时以笔记为准。
+- 相关经验包：`经验-fuxa-112-api-demo-build`（API 建工程的 1.3.3 修正）、`经验-fuxa-112-upgrade-snap7`（升级保留 S7 驱动）。
+
 ## 概述
 
-本技能通过 **FUXA REST API** 远程管理 FUXA SCADA/HMI 服务器。所有操作都通过 HTTP 请求完成，**不需要在本机安装 FUXA**。
+本技能通过 **FUXA REST API** 远程管理 FUXA SCADA/HMI 服务器。设备、标签、报警、脚本、布局等配置通过 HTTP 完成，**不需要在本机安装 FUXA 服务端**；REST API 无端点的前端/容器层需求，按下方「红线规则·二级」的离线受控流程处理。
 
 支持功能：
 1. **远程连接** - 连接任意 FUXA 服务器
@@ -22,17 +29,12 @@ author: "huge"
 8. **用户管理** - 用户、角色、API Key
 9. **系统设置** - 远程修改 FUXA 配置
 
-## 红线规则（必须严格遵守）
+## 红线规则（分级，必须严格遵守）
 
-> **禁止直接修改 FUXA 配置文件。** 所有配置变更必须通过 REST API 完成。
+> 旧版写「禁止直接修改任何配置文件」，在 1.3.3 上**过于绝对**：大量 UI/前端需求 REST API 根本没有端点。按旧红线执行会一件都做不了。改为分级。
 
-**无论 FUXA 是否运行在本机，都不允许：**
-- 直接编辑 `_appdata/mysettings.json`
-- 直接编辑 `_appdata/settings.js`
-- 直接编辑 `_appdata/` 下的任何 `.db` 文件
-- 直接修改项目数据库文件
+### 一级：API 能做的，必须走 API
 
-**正确做法：**
 ```
 client.updateSettings({...})          // 修改系统设置
 client.setDevice({...})              // 配置设备
@@ -40,9 +42,35 @@ client.setAlarmDefinition({...})     // 配置报警
 client.updateProjectData(cmd, data)  // 修改项目数据
 ```
 
-**为什么：** 直接改文件会导致：1) 内存中的配置与文件不一致 2) 需要重启才能生效 3) 可能破坏数据完整性。走 API 是实时生效、有校验、有日志。
+理由：实时生效、有校验、有日志，不会与服务端内存打架。
 
-**唯一例外：** FUXA 服务未启动时的首次部署初始化（仅限 `FUXADeployer` 生成的命令）。
+### 二级：API 覆盖不到的，走「离线受控直改流程」
+
+**必须直改的场景（1.3.3 实证，无 REST 端点或 API 粒度不够）：**
+
+| 需求 | 落点 |
+|---|---|
+| 前端入口注入（UA 跳转 / 登录遮罩 / viewport / PWA）、独立静态页 | 容器内 `client/dist/*.html` |
+| 修复 `property:null` 孤儿控件、清空/改写事件、SVG 物理删除、删视图 | `project.fuxap.db` |
+| 开启 secure、token 有效期、首次建用户/改密码 | `mysettings.json` + `users.fuxap.db`（bcrypt） |
+| 放宽普通用户 tag 读写权限 | 容器内 `server/api/command/index.js` |
+
+**八步 SOP（详见 `references/fuxa-133-field-notes.md` §2）：**
+
+1. 导出备份（老板硬性要求），命名 `<对象>.bak_<用途>_<MMDD_HHMM>`
+2. 盘点差异：与上一个良好快照**逐表逐行 md5 比对**，并全库扫描待删对象的引用
+3. 通知用户**关闭 FUXA 编辑器并强刷**（编辑器内存会整视图覆盖库里的直改内容，实证踩过）
+4. `docker stop fuxa`
+5. 改库 / 改容器文件（SQLite 改完 `VACUUM`）
+6. 逐项校验：除预期对象外其余行 md5 一致、全局关键字无残留
+7. `docker start fuxa`
+8. 真机验证：登录、`/api/project`、页面注入标记、视图路由、导航项、tag 读写、CPU
+
+### 三条硬纪律
+
+- **禁止热改**：服务在跑且编辑器开着时直改文件，必然出现内存与文件不一致。
+- **容器可写层补丁会随镜像重建丢失**：`docker restart` 保留，`docker rm` / 镜像升级全丢。必须把补丁源文件留档并登记清单，重建后复打（笔记 §8）。
+- **辅助系统不得拖垮安全系统**：视频转码等重负载必须与门禁/控制物理隔离（笔记 §9 有容量实测数据）。
 
 ## 数据模型参考（必读）
 
@@ -55,12 +83,19 @@ client.updateProjectData(cmd, data)  // 修改项目数据
 | `references/alarm-template.json` | 报警和通知模板 |
 | `references/config-template.json` | 系统设置模板 |
 | `references/script-template.js` | 脚本代码模板 |
+| `references/fuxa-133-field-notes.md` | **1.3.3 现场实战笔记（必读）**：事件机制、客户端脚本、认证权限、移动端、离线 SOP、容量红线 |
 
 **关键提醒：**
 - Modbus 从站 ID 字段名是 `property.slaveid`（全小写字符串），不是 `unitId` 或 `slaveId`
 - 设备地址字段名是 `property.address`（不是 `host`）
 - 语言代码是 `zh-cn`（不是 `zh`），否则按钮文字消失
 - projectData cmd 值是 `'set-device'`、`'set-alarm'`（不是 `'devices'`、`'alarms'`）
+- **1.3.3 脚本用 `$getTag` / `$setTag`（async，必须 await），不是 `fuxa.getTagValue`**
+- **`$setTag` 必须传 tagId，传中文变量名静默失败**
+- **视图级 `onopen` 只能放一条 `onRunScript`**；放 `onSetValue` 会让该视图所有 onopen 动作静默失效
+- **控件点击事件的 `type` 是 `click`，不是 `onopen`**
+- `GET /api/project` 返回里 **layout 在 `hmi.layout`**；`getTagValue` 用 `?ids=["t_xxx"]`（URL 编码的 JSON 数组）
+- `POST /api/signin` 的 token 在 **`data.token`**，不是顶层 `token`
 
 ## 连接配置（必须先获取）
 
@@ -191,11 +226,11 @@ const allStatus = await client.getAllDeviceConnectionStatus();
 for (const s of allStatus) {
   console.log(s.deviceName + ': ' + s.statusText + ' (值=' + s.status + ')');
 }
-``
+```
 
 **示例 - 读取报警和历史数据：**
 
-​```javascript
+```javascript
 // 获取当前活跃报警
 const alarms = await client.getAlarms();
 console.log('当前报警数:', alarms.length);
@@ -215,7 +250,7 @@ const history = await client.getDaqData(from, to, ['t_tag1', 't_tag2']);
 
 | 方法 | 端点 | 认证 | 说明 |
 |------|------|------|------|
-| POST | `/api/signin` | 无 | 登录，body: `{username, password}`，返回 `{token}` |
+| POST | `/api/signin` | 无 | 登录，body: `{username, password}`；1.3.3 实测返回 `{status, message, data:{username, fullname, groups, info, token}}`，**token 在 `data.token`**（旧文档写 `{token}` 是错的） |
 | POST | `/api/heartbeat` | JWT | 刷新 Token |
 | POST | `/api/signout` | JWT | 登出 |
 | POST | `/api/refresh` | Cookie | 刷新 Token（需 enableRefreshCookieAuth） |
@@ -282,8 +317,10 @@ const history = await client.getDaqData(from, to, ['t_tag1', 't_tag2']);
 
 | 方法 | 端点 | 认证 | 说明 |
 |------|------|------|------|
-| GET | `/api/getTagValue?ids=[...]` | Admin/Script | 读取标签值，ids 为 JSON 数组 |
+| GET | `/api/getTagValue?ids=[...]` | Admin/Script | 读取标签值；`ids` 是 **URL 编码的 JSON 数组**（`?ids=["t_xxx"]`），不是 `?tagId=` |
 | POST | `/api/setTagValue` | Admin | 写入标签值，body: `{tags: [{id, value}]}` |
+
+> ⚠️ **1.3.3 权限实测**：这两个端点**原版硬编码 admin-only**（`authJwt.haveAdminPermission`），普通用户登录后画面能画出来但读不到值、按钮无效，前端 401 还会触发登出→反复弹登录框。若要让 operator 读写 tag，需补丁容器内 `server/api/command/index.js`（实测第 80、124 行改为「admin 或已登录非 guest」）。详见 `fuxa-133-field-notes.md` §6.3。
 
 ### 6. 报警管理 (Alarms)
 
@@ -463,6 +500,13 @@ const history = await client.getDaqData(from, to, ['t_tag1', 't_tag2']);
 | `cmd: 'alarms'` | `cmd: 'set-alarm'` | projectData 命令值 |
 | `memaddress: 'HR40001'` | `memaddress: '400001', address: '1'` | Modbus 地址格式 |
 | `property.port: 502` | `property.port: '502'` | 端口字段类型为字符串 |
+| `fuxa.getTagValue(...)` | `await $getTag(id)` | 1.3.3 已移除 `fuxa.*`（`ReferenceError`） |
+| `$setTag('自动/手动画面切换', 1)` | `$setTag('t_91578f48-...', 1)` | 必须传 tagId，中文名静默失败 |
+| 视图 `onopen` 放 `onSetValue` | `onopen` 只放单条 `onRunScript`，写值进脚本 | 1.3.3 `loadResolvedHmi` 不看 action，会 `clone(undefined)` 中断全部 onopen |
+| 控件事件 `type:'onopen'` | `type:'click'` | 写成 onopen 点了没反应 |
+| 导航项 `permission: 2` | `permission: 0` | 1.3.3 语义反直觉，填组位图反而让该组用户看不到 |
+| `layout.loginonstart: true` | `false` + 前端登录遮罩 | 独立视图 `/view/` 不弹原生框；black 遮罩会让普通用户黑屏 |
+| 仿真设备 `type:'internal'` | `type:'FuxaServer'` | internal 不被实例化，标签读写全 null |
 
 ## 工作流程
 
@@ -508,25 +552,41 @@ const history = await client.getDaqData(from, to, ['t_tag1', 't_tag2']);
 
 ## FUXA 脚本 API 参考
 
-脚本在 FUXA 服务端执行，以下 API 可用：
+> ⚠️ **下表是 1.3.1 写法，在 1.3.3 会报 `ReferenceError: fuxa is not defined`。** 1.3.3 请直接看下方「1.3.3 实际可用」表；完整说明见 `fuxa-133-field-notes.md` §5。
+
+<details>
+<summary>1.3.1 旧 API（仅作历史参考，勿在新工程使用）</summary>
+
+| API | 说明 |
+|-----|------|
+| `fuxa.getTagValue(tagId)` / `fuxa.setTagValue(tagId, value)` | 读/写标签 |
+| `fuxa.getTagQuality(tagId)` | 标签质量 |
+| `fuxa.log(message, level)` | 日志，级别 `info` / `warn` / `error` |
+| `fuxa.setAlarm(alarmId, active)` / `fuxa.ackAlarm(alarmId)` | 触发/确认报警 |
+| `fuxa.enableDevice(deviceId, enable)` | 启用设备 |
+| `fuxa.http.get/post(...)`、`fuxa.setTimeout/setInterval(...)` | HTTP 与定时器 |
+
+</details>
+
+### 1.3.3 实际可用（实证）
 
 | API | 说明 | 示例 |
 |-----|------|------|
-| `fuxa.getTagValue(tagId)` | 获取标签值 | `var temp = fuxa.getTagValue('t_tag1')` |
-| `fuxa.setTagValue(tagId, value)` | 设置标签值 | `fuxa.setTagValue('t_tag2', true)` |
-| `fuxa.getTagQuality(tagId)` | 获取标签质量 | `var q = fuxa.getTagQuality('t_tag1')` |
-| `fuxa.log(message, level)` | 记录日志 | `fuxa.log('警告', 'warn')` |
-| `fuxa.setAlarm(alarmId, active)` | 触发/清除报警 | `fuxa.setAlarm('alarm-001', true)` |
-| `fuxa.ackAlarm(alarmId)` | 确认报警 | `fuxa.ackAlarm('alarm-001')` |
-| `fuxa.enableDevice(deviceId, enable)` | 启用/禁用设备 | `fuxa.enableDevice('d_xxx', false)` |
-| `fuxa.http.get(url, options)` | GET 请求 | `fuxa.http.get('http://api.example.com')` |
-| `fuxa.http.post(url, data, options)` | POST 请求 | `fuxa.http.post(url, {key: 'value'})` |
-| `fuxa.setTimeout(callback, delay)` | 延时执行 | `fuxa.setTimeout(() => {...}, 1000)` |
-| `fuxa.setInterval(callback, delay)` | 定时执行 | `fuxa.setInterval(() => {...}, 5000)` |
+| `$getTag(tagId)` | 读标签值 | `var v = await $getTag('t_91578f48-c3c54079')` |
+| `$setTag(tagId, value)` | 写标签值 | `await $setTag('t_91578f48-c3c54079', 1)` |
+| `$getTagId(name)` | 按名称查 tagId | `var id = await $getTagId('自动/手动画面切换')` |
+| `$setView(id或名称)` | 切换视图 | `$setView('v_0126749a12-a1223')` |
 
-**日志级别**: `info` | `warn` | `error`
+**五条铁律：**
+1. 这四个函数都是 **async，必须 `await`**；`evalScript` 会把代码包成 `(async()=>{...})()` 再 eval。
+2. **`$setTag` 必须传 tagId**，传中文变量名**静默失败**（值不变、无报错）。
+3. `general` 表 `clientAccess` 必须含 `{"scriptSystemFunctions":["$getTag","$setTag","$getTagId","$setView"]}`，否则 `window.fuxaScriptAPI` 里没有这些函数。
+4. **辅助函数不要写成 `async function`**：返回 Promise 后 `.toFixed()` 会抛 TypeError，每个周期都崩。
+5. 仿真设备类型用 `FuxaServer`，**不是 `internal`**（后者不被实例化，读写全 null）。
 
-**脚本模板见**: `references/script-template.js`
+CLIENT 脚本可访问 `window / document / navigator / sessionStorage / location`；SERVER 脚本看不到浏览器当前显示哪个视图，需靠视图 `onopen` 写变量转达。
+
+**脚本模板见**: `references/script-template.js`（旧版，用前按上表改写）
 
 ### 场景 5：查看/修改系统设置
 
@@ -642,7 +702,7 @@ const statusCmds = deployer.statusCommands();
 const compose = deployer.dockerComposeYml();
 ```
 
-### 场景 7：部署 FUXA
+### 场景 14：部署 FUXA
 
 ```
 1. 询问部署方式（docker/source/npm）
@@ -652,7 +712,7 @@ const compose = deployer.dockerComposeYml();
 5. 遍历 deployer.statusCommands()，验证部署成功
 ```
 
-### 场景 8：卸载 FUXA
+### 场景 15：卸载 FUXA
 
 ```
 1. 确认卸载方式（需与部署方式匹配）
@@ -661,7 +721,7 @@ const compose = deployer.dockerComposeYml();
 4. 注意：带 warning 的命令需用户确认后再执行
 ```
 
-### 场景 9：更新/升级 FUXA
+### 场景 16：更新/升级 FUXA
 
 ```
 1. 确认部署方式（需与原部署方式匹配）
@@ -705,8 +765,24 @@ const compose = deployer.dockerComposeYml();
 3. **先连接后操作**：远程管理必须先获取服务器地址和认证信息
 4. **字段名精确匹配**：所有 API 参数字段名必须精确匹配源码定义（见 data-models.md）
 5. **安全第一**：涉及密码、删除操作时提醒用户注意
-6. **版本兼容**：基于 FUXA 1.3.1 REST API
+6. **版本兼容**：REST API 手册基于 1.3.1；本版已回灌 1.3.3 实证修正，现场细节见 `references/fuxa-133-field-notes.md`
 7. **API 文档**：可在设置中启用 `swaggerEnabled: true` 访问 `/api-docs`
+
+## 1.3.3 实战速查（先看这里，再翻 reference）
+
+| 我想做… | 笔记章节 | 一句话结论 |
+|---|---|---|
+| 让脚本知道当前在哪个页面 | §4 | 服务端看不到前端当前视图，只能靠视图 `onopen` 写变量转达；切到同一页不触发 |
+| 固定参数区 + 切换下层页 | §4 | FUXA 没有运行时 group 容器，只能每页各自平铺同一份面板 |
+| 手机自动跳专属页、去掉导航 | §7 | 用原生 `/view/?name=<视图名>`，天生无导航；跳转逻辑放 `index.html` 而非 FUXA 脚本 |
+| 点"退出"关掉浏览器 | §7 | 普通网页做不到；`window.close()` 仅 PWA/standalone 有效，兜底跳静态"已退出"页 |
+| 加登录密码 / 双账户 | §6 | `mysettings.json` + `users.fuxap.db`(bcrypt) + 前端遮罩；tag 读写需补 `command/index.js` |
+| 删一个页面 / 下架一个功能 | §2、§3 | 停服 + 备份 + 逐行 md5 比对 + 全库引用扫描；别只按名字或数字 grep |
+| 接入视频 / 摄像头 | §9 | 浏览器不能播 RTSP/H.265；转码与门禁必须物理隔离，录像存储不放 SCADA 盒子 |
+| 升级/重建容器后功能丢了 | §8 | 容器可写层补丁随镜像重建全丢，需按清单复打 |
+| 页面关了之后模式不回落 | §11 | 已知风险：需心跳变量 + 超时回落，优先级高于加新功能 |
+
+> 全部细节、命令与实测数据见 `references/fuxa-133-field-notes.md`。
 
 ## 常见问题
 
